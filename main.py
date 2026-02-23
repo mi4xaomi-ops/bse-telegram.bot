@@ -1,99 +1,156 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
-import requests
-import xml.etree.ElementTree as ET
 import os
-import hashlib
 import re
-import fitz  # PyMuPDF
-import tempfile
+import requests
+import feedparser
+import hashlib
+from datetime import datetime
 from typing import Dict, List, Any
-
-app = FastAPI()
+from fastapi import FastAPI
 
 # ==========================================================
 # CONFIGURATION
 # ==========================================================
 
-RSS_URL = "https://www.bseindia.com/data/xml/announcements.xml"
+BOT_TOKEN = os.getenv("8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA")
+CHAT_ID = os.getenv("-1003545287392")
+RSS_FEED_URL = os.getenv("RSS_FEED_URL")
 
-BOT_TOKEN = os.environ.get("8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA")
-CHANNEL_ID = os.environ.get("-1003545287392")
-
-if not BOT_TOKEN or not CHANNEL_ID:
-    raise Exception("BOT_TOKEN or CHANNEL_ID not set properly")
-
-HEADERS = {"User-Agent": "Mozilla/5.0"}
-
-POSTED = set()
+app = FastAPI()
 
 # ==========================================================
-# PRIORITY ENGINE
+# CATEGORY MASTER (DEDUPED & PRIORITY SAFE)
 # ==========================================================
 
-PRIORITY_MAP = {
-    "Trading Suspension": 1,
-    "Compulsory Delisting": 1,
-    "Delisting Action": 1,
+CATEGORY_MASTER = [
 
-    "Board Meeting Intimation": 2,
-    "Financial Results": 2,
-    "Listing Update": 2,
-    "Corporate Action - Record Date": 2,
+    {"main": "Financial Results",
+     "priority": 1,
+     "keywords": [
+         "Quarterly Results", "Annual Results", "Financial Results",
+         "Audited Results", "Unaudited Results",
+         "Standalone Results", "Consolidated Results",
+         "Q1", "Q2", "Q3", "Q4"
+     ],
+     "emoji": "📊"},
 
-    "Outcome of Board Meeting": 3,
-    "Dividend": 3,
-    "Bonus Issue": 3,
-    "Stock Split": 3,
-    "Rights Issue": 3,
-    "Buyback": 3,
-    "Acquisition / Investment": 3,
-    "Order / Contract": 3,
+    {"main": "Dividend",
+     "priority": 2,
+     "keywords": ["Interim Dividend", "Final Dividend", "Special Dividend", "Dividend"],
+     "emoji": "💰"},
 
-    "Management Change": 4,
-    "Regulation 30 - Press/Media Release": 4,
-    "Regulation 30 Disclosure": 4,
-    "Investor Presentation": 4,
-    "Shareholding Pattern": 4,
+    {"main": "Bonus / Split",
+     "priority": 2,
+     "keywords": ["Bonus", "Stock Split", "Subdivision"],
+     "emoji": "🎁"},
 
-    "General Corporate Disclosure": 5
-}
+    {"main": "Buyback",
+     "priority": 2,
+     "keywords": ["Buyback"],
+     "emoji": "🔄"},
+
+    {"main": "Rights Issue / Fund Raising",
+     "priority": 2,
+     "keywords": ["Rights Issue", "QIP", "Warrants", "Debenture", "Bond", "Preferential Issue"],
+     "emoji": "🏦"},
+
+    {"main": "Merger / Acquisition",
+     "priority": 3,
+     "keywords": ["Merger", "Acquisition", "Amalgamation"],
+     "emoji": "🤝"},
+
+    {"main": "Order Win / Contract",
+     "priority": 3,
+     "keywords": ["Order Win", "Contract", "Awarded"],
+     "emoji": "📦"},
+
+    {"main": "Board Meeting",
+     "priority": 4,
+     "keywords": ["Board Meeting", "Outcome of Board Meeting", "Board Meeting Intimation"],
+     "emoji": "📋"},
+
+    {"main": "Corporate Governance",
+     "priority": 4,
+     "keywords": ["Corporate Governance Report", "Regulation 27"],
+     "emoji": "🏛"},
+
+    {"main": "AGM / EGM",
+     "priority": 4,
+     "keywords": ["AGM", "EGM", "Postal Ballot", "Voting Results"],
+     "emoji": "🗳"},
+
+    {"main": "Appointment / Resignation",
+     "priority": 4,
+     "keywords": ["Appointment", "Resignation", "CFO", "CEO", "Director"],
+     "emoji": "👤"},
+
+    {"main": "Listing",
+     "priority": 5,
+     "keywords": ["Listing", "Trading Approval", "Commencement of Trading"],
+     "emoji": "🆕"},
+
+    {"main": "Exchange Action",
+     "priority": 5,
+     "keywords": ["Suspension", "Delisting", "GSM", "ASM", "Price Band"],
+     "emoji": "🚨"},
+
+    {"main": "Press Release",
+     "priority": 6,
+     "keywords": ["Press Release", "Media Release"],
+     "emoji": "📰"},
+
+    {"main": "Business Update",
+     "priority": 6,
+     "keywords": ["Operational Update", "Business Update", "Sales Update"],
+     "emoji": "🚀"},
+
+    {"main": "Other",
+     "priority": 99,
+     "keywords": [],
+     "emoji": "📌"},
+]
 
 # ==========================================================
-# HELPERS
+# DUPLICATE SUPPRESSION
 # ==========================================================
 
-def generate_id(title: str, link: str) -> str:
-    return hashlib.md5((title + link).encode()).hexdigest()
+PROCESSED_HASHES = set()
 
+def is_duplicate(title: str) -> bool:
+    title_hash = hashlib.md5(title.encode()).hexdigest()
+    if title_hash in PROCESSED_HASHES:
+        return True
+    PROCESSED_HASHES.add(title_hash)
+    return False
 
-def extract_scrip_code(text: str) -> str:
-    match = re.search(r"Scrip Code\s*:\s*(\d+)", text, re.I)
-    return match.group(1) if match else ""
+# ==========================================================
+# CLASSIFICATION ENGINE
+# ==========================================================
 
+def classify(title: str) -> Dict[str, Any]:
+    title_lower = title.lower()
+    matched = []
 
-def extract_text_from_pdf(url: str) -> str:
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=20)
-        if response.status_code != 200:
-            return ""
+    for category in CATEGORY_MASTER:
+        for keyword in category["keywords"]:
+            if keyword.lower() in title_lower:
+                matched.append(category)
+                break
 
-        with tempfile.NamedTemporaryFile(delete=True, suffix=".pdf") as tmp:
-            tmp.write(response.content)
-            tmp.flush()
+    if not matched:
+        return CATEGORY_MASTER[-1]
 
-            doc = fitz.open(tmp.name)
-            text = ""
+    matched_sorted = sorted(matched, key=lambda x: x["priority"])
+    return matched_sorted[0]
 
-            for page in doc[:3]:
-                text += page.get_text()
+# ==========================================================
+# RECORD DATE DETECTION (SEPARATE – NO DUPLICATION)
+# ==========================================================
 
-            doc.close()
-            return text
-
-    except Exception:
-        return ""
-
+def detect_record_date(text: str) -> str:
+    match = re.search(r"Record Date[:\s]*([\d\-\/]+)", text, re.I)
+    if match:
+        return match.group(1)
+    return ""
 
 # ==========================================================
 # FINANCIAL EXTRACTION
@@ -102,210 +159,70 @@ def extract_text_from_pdf(url: str) -> str:
 def extract_financials(text: str) -> List[str]:
     results = []
 
-    patterns = {
-        "Revenue": r"(Revenue|Total Income)[^\d]{0,40}([\d,]+\.*\d*)",
-        "Net Profit": r"(Net Profit|PAT|Profit After Tax)[^\d\-]{0,40}([\d,\-]+\.*\d*)",
-        "EBITDA": r"(EBITDA)[^\d\-]{0,40}([\d,\-]+\.*\d*)",
-        "EPS": r"(EPS|Earnings Per Share)[^\d\-]{0,40}([\d\.\-]+)",
-        "Dividend": r"Dividend[^\d]{0,25}([\d\.]+)"
-    }
+    revenue = re.search(r"(Revenue|Total Income)[^\d]{0,25}([\d,]+\.*\d*)", text, re.I)
+    profit = re.search(r"(Net Profit|PAT)[^\d\-]{0,25}([\d,\-]+\.*\d*)", text, re.I)
+    eps = re.search(r"(EPS)[^\d\-]{0,25}([\d\.\-]+)", text, re.I)
 
-    for label, pattern in patterns.items():
-        match = re.search(pattern, text, re.I)
-        if match:
-            value = match.group(2) if label != "Dividend" else match.group(1)
-            if label == "Dividend":
-                results.append(f"Dividend: ₹{value} per share")
-            else:
-                results.append(f"{label}: ₹{value}")
+    if revenue:
+        results.append(f"Revenue: ₹{revenue.group(2)}")
+
+    if profit:
+        results.append(f"Net Profit: ₹{profit.group(2)}")
+
+    if eps:
+        results.append(f"EPS: ₹{eps.group(2)}")
 
     return results
 
-
-def extract_record_date(text: str) -> str:
-    patterns = [
-        r"Record Date[^\d]{0,20}(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
-        r"Record Date[^\d]{0,20}(\d{1,2}\s?[A-Za-z]+\s?\d{4})"
-    ]
-
-    for pattern in patterns:
-        match = re.search(pattern, text, re.I)
-        if match:
-            return match.group(1)
-
-    return ""
-
-
 # ==========================================================
-# CLASSIFICATION ENGINE
+# TELEGRAM SENDER
 # ==========================================================
 
-def classify_bse(title: str, text: str) -> Dict[str, Any]:
-
-    categories = []
-    title_lower = title.lower()
-
-    # Exchange Actions
-    exchange_actions = {
-        "compulsory delisting": "Compulsory Delisting",
-        "delisting": "Delisting Action",
-        "suspension": "Trading Suspension",
-        "gsm": "GSM Surveillance",
-        "asm": "ASM Surveillance"
+def send_telegram(message: str):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": message,
+        "parse_mode": "HTML"
     }
-
-    for key, value in exchange_actions.items():
-        if key in title_lower:
-            categories.append(value)
-
-    # Listing
-    if any(k in title_lower for k in [
-        "listing of equity shares",
-        "listing approval",
-        "trading approval",
-        "ipo listing",
-        "commencement of trading"
-    ]):
-        categories.append("Listing Update")
-
-    # Board Meeting
-    if any(k in title_lower for k in [
-        "board meeting intimation",
-        "intimation of board meeting",
-        "notice of board meeting"
-    ]):
-        categories.append("Board Meeting Intimation")
-
-    elif "outcome of board meeting" in title_lower:
-        categories.append("Outcome of Board Meeting")
-
-    elif "board meeting" in title_lower:
-        categories.append("Board Meeting")
-
-    # Financial Results
-    if any(k in title_lower for k in [
-        "financial results",
-        "quarterly results",
-        "annual results",
-        "audited",
-        "unaudited",
-        "q1", "q2", "q3", "q4"
-    ]):
-        categories.append("Financial Results")
-
-    # Corporate Actions
-    corporate = {
-        "dividend": "Dividend",
-        "bonus": "Bonus Issue",
-        "split": "Stock Split",
-        "rights": "Rights Issue",
-        "buyback": "Buyback"
-    }
-
-    for key, value in corporate.items():
-        if key in title_lower:
-            categories.append(value)
-
-    # Regulation 30
-    if "regulation 30" in title_lower:
-        if "press release" in title_lower or "media release" in title_lower:
-            categories.append("Regulation 30 - Press/Media Release")
-        else:
-            categories.append("Regulation 30 Disclosure")
-
-    if not categories:
-        categories.append("General Corporate Disclosure")
-
-    categories = list(set(categories))
-    priority = min([PRIORITY_MAP.get(cat, 5) for cat in categories])
-
-    financials = extract_financials(text)
-    record_date = extract_record_date(text)
-
-    return {
-        "categories": categories,
-        "priority": priority,
-        "financials": financials,
-        "record_date": record_date
-    }
-
+    requests.post(url, data=payload)
 
 # ==========================================================
-# ROUTES
+# MAIN RSS PROCESSOR
 # ==========================================================
-
-@app.get("/")
-async def health():
-    return {"status": "BSE bot running"}
 
 @app.get("/run")
-async def run_bot():
+def run_bot():
 
-    response = requests.get(RSS_URL, headers=HEADERS, timeout=20)
-    if response.status_code != 200:
-        raise HTTPException(status_code=500, detail="RSS fetch failed")
+    feed = feedparser.parse(RSS_FEED_URL)
 
-    root = ET.fromstring(response.content)
-    channel = root.find("channel")
-    items = channel.findall("item")
+    for entry in feed.entries:
 
-    for item in items:
+        title = entry.title.strip()
 
-        title = item.findtext("title", "")
-        link = item.findtext("link", "")
-        description = item.findtext("description", "")
-
-        if not title or not link:
+        if is_duplicate(title):
             continue
 
-        scrip_code = extract_scrip_code(description)
-        if not scrip_code:
-            continue
+        summary = entry.summary if "summary" in entry else ""
+        link = entry.link
 
-        uid = generate_id(title, link)
-        if uid in POSTED:
-            continue
-
-        pdf_text = extract_text_from_pdf(link)
-
-        classification = classify_bse(title, pdf_text)
-
-        summary_lines = []
-
-        if classification["financials"]:
-            summary_lines.extend(classification["financials"])
-
-        if classification["record_date"]:
-            summary_lines.append(f"Record Date: {classification['record_date']}")
-
-        if not summary_lines:
-            summary_lines.append("Refer detailed filing for complete disclosure.")
-
-        summary_text = "\n".join([f"• {line}" for line in summary_lines])
+        category = classify(title)
+        record_date = detect_record_date(summary)
+        financials = extract_financials(summary)
 
         message = (
-            f"📢 <b>{title}</b>\n\n"
-            f"🏷 Scrip Code: {scrip_code}\n"
-            f"📂 Categories: {', '.join(classification['categories'])}\n\n"
-            f"{summary_text}\n\n"
-            f"🔗 <a href='{link}'>View Filing</a>"
+            f"{category['emoji']} <b>{category['main']}</b>\n\n"
+            f"🏢 {title}\n"
         )
 
-        telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        if record_date:
+            message += f"📅 Record Date: {record_date}\n"
 
-        tg_response = requests.post(
-            telegram_url,
-            json={
-                "chat_id": CHANNEL_ID,
-                "text": message,
-                "parse_mode": "HTML",
-                "disable_web_page_preview": True
-            },
-            timeout=15
-        )
+        if financials:
+            message += "\n".join(financials) + "\n"
 
-        if tg_response.status_code == 200:
-            POSTED.add(uid)
-            break
+        message += f"\n🔗 {link}"
 
-    return JSONResponse(content={"status": "checked"}, status_code=200)
+        send_telegram(message)
+
+    return {"status": "Bot executed successfully"}
