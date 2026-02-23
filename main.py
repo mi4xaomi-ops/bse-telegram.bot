@@ -179,9 +179,9 @@ def extract_financials(text: str) -> List[str]:
 # ==========================================================
 
 def send_telegram(message: str):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA}/sendMessage"
     payload = {
-        "chat_id": CHAT_ID,
+        "chat_id": -1003545287392,
         "text": message,
         "parse_mode": "HTML"
     }
