@@ -15,8 +15,8 @@ app = FastAPI()
 # --------------------------------
 
 RSS_URL = "https://www.bseindia.com/data/xml/announcements.xml"
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CHANNEL_ID = os.environ.get("CHANNEL_ID")
+BOT_TOKEN = os.environ.get("8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA")
+CHANNEL_ID = os.environ.get("-1003545287392")
 
 if not BOT_TOKEN or not CHANNEL_ID:
     raise Exception("BOT_TOKEN or CHANNEL_ID not set in environment")
