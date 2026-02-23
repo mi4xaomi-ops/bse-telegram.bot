@@ -6,6 +6,7 @@ import hashlib
 from datetime import datetime
 from typing import Dict, List, Any
 from fastapi import FastAPI
+import uvicorn
 
 # ==========================================================
 # CONFIGURATION
