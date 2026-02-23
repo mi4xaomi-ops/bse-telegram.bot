@@ -1,68 +1,54 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, HttpUrl
+from fastapi import FastAPI
 import requests
-import pdfplumber
-import io
-import re
+import xml.etree.ElementTree as ET
+import os
+import hashlib
 
 app = FastAPI()
 
-class PDFRequest(BaseModel):
-    pdf_url: HttpUrl   # validates URL properly
+RSS_URL = "https://www.bseindia.com/data/xml/announcements.xml"
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+CHANNEL_ID = os.environ["CHANNEL_ID"]
+
+POSTED = set()
+
+def generate_id(title, link):
+    return hashlib.md5((title+link).encode()).hexdigest()
 
 @app.get("/")
 def home():
-    return {"status": "API running"}
+    return {"status": "running"}
 
-def clean_text(text):
-    return re.sub(r"\s+", " ", text)
+@app.get("/run")
+def run():
 
-def extract_key_points(text):
+    response = requests.get(RSS_URL)
+    root = ET.fromstring(response.content)
 
-    bullets = []
+    for item in root.find("channel").findall("item"):
 
-    revenue = re.search(r"(Revenue|Total Income)[^0-9]{0,20}([\d,]+\.*\d*)", text, re.I)
-    if revenue:
-        bullets.append(f"Revenue reported at ₹{revenue.group(2)}")
+        title = item.find("title").text
+        link = item.find("link").text
+        description = item.find("description").text or ""
 
-    profit = re.search(r"(Net Profit|PAT|Profit After Tax)[^0-9\-]{0,20}([\d,\-]+\.*\d*)", text, re.I)
-    if profit:
-        bullets.append(f"Net Profit at ₹{profit.group(2)}")
+        if "Scrip Code" not in description:
+            continue
 
-    if not bullets:
-        bullets.append("Material corporate update announced.")
+        uid = generate_id(title, link)
+        if uid in POSTED:
+            continue
 
-    return bullets[:3]
+        message = f"📢 <b>{title}</b>\n\n🔗 {link}"
 
-@app.post("/summarize")
-def summarize(data: PDFRequest):
+        telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
+        requests.post(telegram_url, json={
+            "chat_id": CHANNEL_ID,
+            "text": message,
+            "parse_mode": "HTML"
+        })
 
-        response = requests.get(str(data.pdf_url), headers=headers, timeout=15)
+        POSTED.add(uid)
+        break
 
-        if response.status_code != 200:
-            raise HTTPException(status_code=400, detail="PDF download failed")
-
-        pdf_bytes = io.BytesIO(response.content)
-        full_text = ""
-
-        with pdfplumber.open(pdf_bytes) as pdf:
-            for page in pdf.pages[:2]:  # limit pages
-                text = page.extract_text()
-                if text:
-                    full_text += text
-
-        if not full_text:
-            return {"bullets": ["Unable to extract readable text from PDF."]}
-
-        full_text = clean_text(full_text)
-        bullets = extract_key_points(full_text)
-
-        return {"bullets": bullets}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "checked"}
