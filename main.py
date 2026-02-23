@@ -24,90 +24,251 @@ app = FastAPI()
 
 CATEGORY_MASTER = [
 
-    {"main": "Financial Results",
-     "priority": 1,
-     "keywords": [
-         "Quarterly Results", "Annual Results", "Financial Results",
-         "Audited Results", "Unaudited Results",
-         "Standalone Results", "Consolidated Results",
-         "Q1", "Q2", "Q3", "Q4"
-     ],
-     "emoji": "📊"},
+    # ======================================================
+    # 1️⃣ FINANCIAL RESULTS (Highest Priority)
+    # ======================================================
+    {
+        "main": "Financial Results",
+        "priority": 1,
+        "keywords": [
+            "Quarterly Results",
+            "Annual Results",
+            "Financial Results",
+            "Audited Results",
+            "Unaudited Results",
+            "Standalone Results",
+            "Consolidated Results",
+            "Q1", "Q2", "Q3", "Q4",
+            "Regulation 33"
+        ],
+        "emoji": "📊"
+    },
 
-    {"main": "Dividend",
-     "priority": 2,
-     "keywords": ["Interim Dividend", "Final Dividend", "Special Dividend", "Dividend"],
-     "emoji": "💰"},
+    # ======================================================
+    # 2️⃣ DIVIDEND
+    # ======================================================
+    {
+        "main": "Dividend",
+        "priority": 2,
+        "keywords": [
+            "Dividend",
+            "Interim Dividend",
+            "Final Dividend",
+            "Special Dividend"
+        ],
+        "emoji": "💰"
+    },
 
-    {"main": "Bonus / Split",
-     "priority": 2,
-     "keywords": ["Bonus", "Stock Split", "Subdivision"],
-     "emoji": "🎁"},
+    # ======================================================
+    # 3️⃣ BONUS / SPLIT
+    # ======================================================
+    {
+        "main": "Bonus / Split",
+        "priority": 2,
+        "keywords": [
+            "Bonus",
+            "Stock Split",
+            "Subdivision",
+            "Face Value Split"
+        ],
+        "emoji": "🎁"
+    },
 
-    {"main": "Buyback",
-     "priority": 2,
-     "keywords": ["Buyback"],
-     "emoji": "🔄"},
+    # ======================================================
+    # 4️⃣ BUYBACK
+    # ======================================================
+    {
+        "main": "Buyback",
+        "priority": 2,
+        "keywords": [
+            "Buyback",
+            "Buy Back"
+        ],
+        "emoji": "🔄"
+    },
 
-    {"main": "Rights Issue / Fund Raising",
-     "priority": 2,
-     "keywords": ["Rights Issue", "QIP", "Warrants", "Debenture", "Bond", "Preferential Issue"],
-     "emoji": "🏦"},
+    # ======================================================
+    # 5️⃣ FUND RAISING / CAPITAL ISSUE
+    # ======================================================
+    {
+        "main": "Fund Raising / Capital Issue",
+        "priority": 2,
+        "keywords": [
+            "Rights Issue",
+            "QIP",
+            "Qualified Institutions Placement",
+            "Preferential Issue",
+            "Warrants",
+            "Debentures",
+            "NCD",
+            "Bond Issue",
+            "Allotment",
+            "ESOP",
+            "Employee Stock Option"
+        ],
+        "emoji": "🏦"
+    },
 
-    {"main": "Merger / Acquisition",
-     "priority": 3,
-     "keywords": ["Merger", "Acquisition", "Amalgamation"],
-     "emoji": "🤝"},
+    # ======================================================
+    # 6️⃣ MERGER / ACQUISITION
+    # ======================================================
+    {
+        "main": "Merger / Acquisition",
+        "priority": 3,
+        "keywords": [
+            "Merger",
+            "Acquisition",
+            "Amalgamation",
+            "Scheme of Arrangement",
+            "Takeover"
+        ],
+        "emoji": "🤝"
+    },
 
-    {"main": "Order Win / Contract",
-     "priority": 3,
-     "keywords": ["Order Win", "Contract", "Awarded"],
-     "emoji": "📦"},
+    # ======================================================
+    # 7️⃣ ORDER WIN / CONTRACT
+    # ======================================================
+    {
+        "main": "Order Win / Contract",
+        "priority": 3,
+        "keywords": [
+            "Order Win",
+            "Order Received",
+            "Contract Awarded",
+            "Letter of Award",
+            "LOA",
+            "LOI",
+            "MoU"
+        ],
+        "emoji": "📦"
+    },
 
-    {"main": "Board Meeting",
-     "priority": 4,
-     "keywords": ["Board Meeting", "Outcome of Board Meeting", "Board Meeting Intimation"],
-     "emoji": "📋"},
+    # ======================================================
+    # 8️⃣ BOARD MEETING
+    # ======================================================
+    {
+        "main": "Board Meeting",
+        "priority": 4,
+        "keywords": [
+            "Board Meeting",
+            "Outcome of Board Meeting",
+            "Board Meeting Intimation"
+        ],
+        "emoji": "📋"
+    },
 
-    {"main": "Corporate Governance",
-     "priority": 4,
-     "keywords": ["Corporate Governance Report", "Regulation 27"],
-     "emoji": "🏛"},
+    # ======================================================
+    # 9️⃣ AGM / EGM / VOTING
+    # ======================================================
+    {
+        "main": "AGM / EGM / Voting",
+        "priority": 4,
+        "keywords": [
+            "AGM",
+            "EGM",
+            "Postal Ballot",
+            "Voting Results",
+            "Regulation 44"
+        ],
+        "emoji": "🗳"
+    },
 
-    {"main": "AGM / EGM",
-     "priority": 4,
-     "keywords": ["AGM", "EGM", "Postal Ballot", "Voting Results"],
-     "emoji": "🗳"},
+    # ======================================================
+    # 🔟 MANAGEMENT CHANGES
+    # ======================================================
+    {
+        "main": "Management Change",
+        "priority": 4,
+        "keywords": [
+            "Appointment",
+            "Resignation",
+            "CFO",
+            "CEO",
+            "Managing Director",
+            "Independent Director",
+            "Company Secretary"
+        ],
+        "emoji": "👤"
+    },
 
-    {"main": "Appointment / Resignation",
-     "priority": 4,
-     "keywords": ["Appointment", "Resignation", "CFO", "CEO", "Director"],
-     "emoji": "👤"},
+    # ======================================================
+    # 1️⃣1️⃣ GOVERNANCE / COMPLIANCE
+    # ======================================================
+    {
+        "main": "Corporate Governance / Compliance",
+        "priority": 5,
+        "keywords": [
+            "Corporate Governance Report",
+            "Regulation 27",
+            "Shareholding Pattern",
+            "Related Party Transaction",
+            "Regulation 30",
+            "Disclosure under Regulation"
+        ],
+        "emoji": "🏛"
+    },
 
-    {"main": "Listing",
-     "priority": 5,
-     "keywords": ["Listing", "Trading Approval", "Commencement of Trading"],
-     "emoji": "🆕"},
+    # ======================================================
+    # 1️⃣2️⃣ BUSINESS UPDATE
+    # ======================================================
+    {
+        "main": "Business Update",
+        "priority": 6,
+        "keywords": [
+            "Operational Update",
+            "Business Update",
+            "Sales Update",
+            "Capacity Expansion",
+            "New Project",
+            "Expansion"
+        ],
+        "emoji": "🚀"
+    },
 
-    {"main": "Exchange Action",
-     "priority": 5,
-     "keywords": ["Suspension", "Delisting", "GSM", "ASM", "Price Band"],
-     "emoji": "🚨"},
+    # ======================================================
+    # 1️⃣3️⃣ EXCHANGE / REGULATORY ACTION
+    # ======================================================
+    {
+        "main": "Exchange / Regulatory Action",
+        "priority": 7,
+        "keywords": [
+            "Suspension",
+            "Delisting",
+            "GSM",
+            "ASM",
+            "Price Band",
+            "Clarification",
+            "Reply to Exchange Query"
+        ],
+        "emoji": "🚨"
+    },
 
-    {"main": "Press Release",
-     "priority": 6,
-     "keywords": ["Press Release", "Media Release"],
-     "emoji": "📰"},
+    # ======================================================
+    # 1️⃣4️⃣ INVESTOR / PRESS COMMUNICATION
+    # ======================================================
+    {
+        "main": "Investor / Press Communication",
+        "priority": 8,
+        "keywords": [
+            "Press Release",
+            "Media Release",
+            "Investor Presentation",
+            "Earnings Call",
+            "Analyst Meet",
+            "Transcript"
+        ],
+        "emoji": "📰"
+    },
 
-    {"main": "Business Update",
-     "priority": 6,
-     "keywords": ["Operational Update", "Business Update", "Sales Update"],
-     "emoji": "🚀"},
-
-    {"main": "Other",
-     "priority": 99,
-     "keywords": [],
-     "emoji": "📌"},
+    # ======================================================
+    # DEFAULT
+    # ======================================================
+    {
+        "main": "Other",
+        "priority": 99,
+        "keywords": [],
+        "emoji": "📌"
+    }
 ]
 
 # ==========================================================
