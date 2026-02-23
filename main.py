@@ -37,7 +37,7 @@ def extract_key_points(text):
 @app.post("/summarize")
 def summarize(data: PDFRequest):
 
-    try:
+    finally:
         headers = {
     "User-Agent": "Mozilla/5.0"
 }
