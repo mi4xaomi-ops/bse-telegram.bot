@@ -7,8 +7,8 @@ import hashlib
 app = FastAPI()
 
 RSS_URL = "https://www.bseindia.com/data/xml/announcements.xml"
-BOT_TOKEN = os.environ["BOT_TOKEN"]
-CHANNEL_ID = os.environ["CHANNEL_ID"]
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+CHANNEL_ID = os.environ.get("CHANNEL_ID")
 
 POSTED = set()
 
@@ -22,8 +22,19 @@ def home():
 @app.get("/run")
 def run():
     try:
-        response = requests.get(RSS_URL, timeout=10)
-        root = ET.fromstring(response.content)
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+
+        response = requests.get(RSS_URL, headers=headers, timeout=10)
+
+        if response.status_code != 200:
+            return {"error": f"RSS fetch failed: {response.status_code}"}
+
+        try:
+            root = ET.fromstring(response.content)
+        except ET.ParseError:
+            return {"error": "Invalid XML received from BSE"}
 
         channel = root.find("channel")
         if channel is None:
@@ -46,7 +57,7 @@ def run():
 
             telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-            requests.post(
+            tg_response = requests.post(
                 telegram_url,
                 json={
                     "chat_id": CHANNEL_ID,
@@ -54,6 +65,9 @@ def run():
                     "parse_mode": "HTML"
                 }
             )
+
+            if tg_response.status_code != 200:
+                return {"error": "Telegram send failed"}
 
             POSTED.add(uid)
             break
