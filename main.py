@@ -38,7 +38,11 @@ def extract_key_points(text):
 def summarize(data: PDFRequest):
 
     try:
-        response = requests.get(data.pdf_url, timeout=15)
+        headers = {
+    "User-Agent": "Mozilla/5.0"
+}
+
+response = requests.get(data.pdf_url, headers=headers, timeout=15)
 
         if response.status_code != 200:
             raise HTTPException(status_code=400, detail="PDF download failed")
