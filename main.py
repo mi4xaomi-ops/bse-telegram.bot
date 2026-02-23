@@ -7,38 +7,74 @@ import hashlib
 import re
 import fitz  # PyMuPDF
 import tempfile
+from typing import Dict, List, Any
 
 app = FastAPI()
 
-# --------------------------------
-# CONFIG
-# --------------------------------
+# ==========================================================
+# CONFIGURATION
+# ==========================================================
 
 RSS_URL = "https://www.bseindia.com/data/xml/announcements.xml"
-BOT_TOKEN = os.environ.get("8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA")
-CHANNEL_ID = os.environ.get("-1003545287392")
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+CHANNEL_ID = os.environ.get("CHANNEL_ID")
 
 if not BOT_TOKEN or not CHANNEL_ID:
-    raise Exception("BOT_TOKEN or CHANNEL_ID not set in environment")
+    raise Exception("BOT_TOKEN or CHANNEL_ID not set properly")
+
+HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 POSTED = set()
 
-# --------------------------------
-# HELPERS
-# --------------------------------
+# ==========================================================
+# PRIORITY ENGINE
+# ==========================================================
 
-def generate_id(title, link):
+PRIORITY_MAP = {
+    "Trading Suspension": 1,
+    "Compulsory Delisting": 1,
+    "Delisting Action": 1,
+
+    "Board Meeting Intimation": 2,
+    "Financial Results": 2,
+    "Listing Update": 2,
+    "Corporate Action - Record Date": 2,
+
+    "Outcome of Board Meeting": 3,
+    "Dividend": 3,
+    "Bonus Issue": 3,
+    "Stock Split": 3,
+    "Rights Issue": 3,
+    "Buyback": 3,
+    "Acquisition / Investment": 3,
+    "Order / Contract": 3,
+
+    "Management Change": 4,
+    "Regulation 30 - Press/Media Release": 4,
+    "Regulation 30 Disclosure": 4,
+    "Investor Presentation": 4,
+    "Shareholding Pattern": 4,
+
+    "General Corporate Disclosure": 5
+}
+
+# ==========================================================
+# HELPERS
+# ==========================================================
+
+def generate_id(title: str, link: str) -> str:
     return hashlib.md5((title + link).encode()).hexdigest()
 
 
-def extract_scrip_code(text):
+def extract_scrip_code(text: str) -> str:
     match = re.search(r"Scrip Code\s*:\s*(\d+)", text, re.I)
-    return match.group(1) if match else None
+    return match.group(1) if match else ""
 
 
-def extract_text_from_pdf(url):
+def extract_text_from_pdf(url: str) -> str:
     try:
-        response = requests.get(url, timeout=20)
+        response = requests.get(url, headers=HEADERS, timeout=20)
         if response.status_code != 200:
             return ""
 
@@ -47,9 +83,9 @@ def extract_text_from_pdf(url):
             tmp.flush()
 
             doc = fitz.open(tmp.name)
-
             text = ""
-            for page in doc[:3]:  # Only first 3 pages for speed
+
+            for page in doc[:3]:
                 text += page.get_text()
 
             doc.close()
@@ -59,82 +95,162 @@ def extract_text_from_pdf(url):
         return ""
 
 
-def extract_financials(text):
+# ==========================================================
+# FINANCIAL EXTRACTION
+# ==========================================================
+
+def extract_financials(text: str) -> List[str]:
     results = []
 
-    revenue = re.search(r"(Revenue|Total Income)[^\d]{0,25}([\d,]+\.*\d*)", text, re.I)
-    profit = re.search(r"(Net Profit|PAT|Profit After Tax)[^\d\-]{0,25}([\d,\-]+\.*\d*)", text, re.I)
-    eps = re.search(r"(EPS|Earnings Per Share)[^\d\-]{0,25}([\d\.\-]+)", text, re.I)
-    dividend = re.search(r"Dividend[^\d]{0,25}([\d\.]+)", text, re.I)
+    patterns = {
+        "Revenue": r"(Revenue|Total Income)[^\d]{0,40}([\d,]+\.*\d*)",
+        "Net Profit": r"(Net Profit|PAT|Profit After Tax)[^\d\-]{0,40}([\d,\-]+\.*\d*)",
+        "EBITDA": r"(EBITDA)[^\d\-]{0,40}([\d,\-]+\.*\d*)",
+        "EPS": r"(EPS|Earnings Per Share)[^\d\-]{0,40}([\d\.\-]+)",
+        "Dividend": r"Dividend[^\d]{0,25}([\d\.]+)"
+    }
 
-    if revenue:
-        results.append(f"Revenue: ₹{revenue.group(2)}")
-
-    if profit:
-        results.append(f"Net Profit: ₹{profit.group(2)}")
-
-    if eps:
-        results.append(f"EPS: ₹{eps.group(2)}")
-
-    if dividend:
-        results.append(f"Dividend: ₹{dividend.group(1)} per share")
+    for label, pattern in patterns.items():
+        match = re.search(pattern, text, re.I)
+        if match:
+            value = match.group(2) if label != "Dividend" else match.group(1)
+            if label == "Dividend":
+                results.append(f"Dividend: ₹{value} per share")
+            else:
+                results.append(f"{label}: ₹{value}")
 
     return results
 
 
-def generate_corporate_summary(title):
-    summary = []
+def extract_record_date(text: str) -> str:
+    patterns = [
+        r"Record Date[^\d]{0,20}(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})",
+        r"Record Date[^\d]{0,20}(\d{1,2}\s?[A-Za-z]+\s?\d{4})"
+    ]
 
-    if "Board Meeting" in title:
-        summary.append("Board meeting update released.")
+    for pattern in patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            return match.group(1)
 
-    if "Acquisition" in title or "Investment" in title:
-        summary.append("Strategic expansion update.")
-
-    if "Resignation" in title:
-        summary.append("Management personnel update.")
-
-    if "Order" in title or "Contract" in title:
-        summary.append("New order/contract secured.")
-
-    if not summary:
-        summary.append("Material corporate announcement released.")
-
-    return summary[:3]
+    return ""
 
 
-# --------------------------------
+# ==========================================================
+# CLASSIFICATION ENGINE
+# ==========================================================
+
+def classify_bse(title: str, text: str) -> Dict[str, Any]:
+
+    categories = []
+    title_lower = title.lower()
+
+    # Exchange Actions
+    exchange_actions = {
+        "compulsory delisting": "Compulsory Delisting",
+        "delisting": "Delisting Action",
+        "suspension": "Trading Suspension",
+        "gsm": "GSM Surveillance",
+        "asm": "ASM Surveillance"
+    }
+
+    for key, value in exchange_actions.items():
+        if key in title_lower:
+            categories.append(value)
+
+    # Listing
+    if any(k in title_lower for k in [
+        "listing of equity shares",
+        "listing approval",
+        "trading approval",
+        "ipo listing",
+        "commencement of trading"
+    ]):
+        categories.append("Listing Update")
+
+    # Board Meeting
+    if any(k in title_lower for k in [
+        "board meeting intimation",
+        "intimation of board meeting",
+        "notice of board meeting"
+    ]):
+        categories.append("Board Meeting Intimation")
+
+    elif "outcome of board meeting" in title_lower:
+        categories.append("Outcome of Board Meeting")
+
+    elif "board meeting" in title_lower:
+        categories.append("Board Meeting")
+
+    # Financial Results
+    if any(k in title_lower for k in [
+        "financial results",
+        "quarterly results",
+        "annual results",
+        "audited",
+        "unaudited",
+        "q1", "q2", "q3", "q4"
+    ]):
+        categories.append("Financial Results")
+
+    # Corporate Actions
+    corporate = {
+        "dividend": "Dividend",
+        "bonus": "Bonus Issue",
+        "split": "Stock Split",
+        "rights": "Rights Issue",
+        "buyback": "Buyback"
+    }
+
+    for key, value in corporate.items():
+        if key in title_lower:
+            categories.append(value)
+
+    # Regulation 30
+    if "regulation 30" in title_lower:
+        if "press release" in title_lower or "media release" in title_lower:
+            categories.append("Regulation 30 - Press/Media Release")
+        else:
+            categories.append("Regulation 30 Disclosure")
+
+    if not categories:
+        categories.append("General Corporate Disclosure")
+
+    categories = list(set(categories))
+    priority = min([PRIORITY_MAP.get(cat, 5) for cat in categories])
+
+    financials = extract_financials(text)
+    record_date = extract_record_date(text)
+
+    return {
+        "categories": categories,
+        "priority": priority,
+        "financials": financials,
+        "record_date": record_date
+    }
+
+
+# ==========================================================
 # ROUTES
-# --------------------------------
+# ==========================================================
 
 @app.get("/")
 async def health():
-    return {"status": "running"}
-
+    return {"status": "BSE bot running"}
 
 @app.get("/run")
-@app.get("/run/")
 async def run_bot():
 
-    headers = {"User-Agent": "Mozilla/5.0"}
-
-    response = requests.get(RSS_URL, headers=headers, timeout=20)
-
+    response = requests.get(RSS_URL, headers=HEADERS, timeout=20)
     if response.status_code != 200:
         raise HTTPException(status_code=500, detail="RSS fetch failed")
 
-    try:
-        root = ET.fromstring(response.content)
-    except ET.ParseError:
-        raise HTTPException(status_code=500, detail="Invalid XML from BSE")
-
+    root = ET.fromstring(response.content)
     channel = root.find("channel")
-    if channel is None:
-        raise HTTPException(status_code=500, detail="Invalid RSS structure")
-
     items = channel.findall("item")
 
     for item in items:
+
         title = item.findtext("title", "")
         link = item.findtext("link", "")
         description = item.findtext("description", "")
@@ -144,7 +260,7 @@ async def run_bot():
 
         scrip_code = extract_scrip_code(description)
         if not scrip_code:
-            continue  # Equity only
+            continue
 
         uid = generate_id(title, link)
         if uid in POSTED:
@@ -152,25 +268,27 @@ async def run_bot():
 
         pdf_text = extract_text_from_pdf(link)
 
-        is_financial = any(k in title.lower() for k in [
-            "result", "financial", "quarter", "standalone", "consolidated"
-        ])
+        classification = classify_bse(title, pdf_text)
 
-        if is_financial:
-            summary_points = extract_financials(pdf_text)
-        else:
-            summary_points = generate_corporate_summary(title)
+        summary_lines = []
 
-        if not summary_points:
-            summary_points = ["Refer detailed filing for complete information."]
+        if classification["financials"]:
+            summary_lines.extend(classification["financials"])
 
-        summary_text = "\n".join([f"• {p}" for p in summary_points])
+        if classification["record_date"]:
+            summary_lines.append(f"Record Date: {classification['record_date']}")
+
+        if not summary_lines:
+            summary_lines.append("Refer detailed filing for complete disclosure.")
+
+        summary_text = "\n".join([f"• {line}" for line in summary_lines])
 
         message = (
             f"📢 <b>{title}</b>\n\n"
-            f"🏷 Scrip Code: {scrip_code}\n\n"
+            f"🏷 Scrip Code: {scrip_code}\n"
+            f"📂 Categories: {', '.join(classification['categories'])}\n\n"
             f"{summary_text}\n\n"
-            f"🔗 Raw Filing: {link}"
+            f"🔗 <a href='{link}'>View Filing</a>"
         )
 
         telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -180,7 +298,8 @@ async def run_bot():
             json={
                 "chat_id": CHANNEL_ID,
                 "text": message,
-                "parse_mode": "HTML"
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True
             },
             timeout=15
         )
