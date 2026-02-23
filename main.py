@@ -21,11 +21,42 @@ def home():
 
 @app.get("/run")
 def run():
+    try:
+        response = requests.get(RSS_URL, timeout=10)
+        root = ET.fromstring(response.content)
 
-    response = requests.get(RSS_URL)
-    root = ET.fromstring(response.content)
+        channel = root.find("channel")
+        if channel is None:
+            return {"error": "Invalid RSS structure"}
 
-    for item in root.find("channel").findall("item"):
+        items = channel.findall("item")
+        if not items:
+            return {"status": "No items found"}
+
+        for item in items[:5]:
+
+            title = item.findtext("title", "")
+            link = item.findtext("link", "")
+
+            if not title or not link:
+                continue
+
+            message = f"📢 <b>{title}</b>\n\n🔗 {link}"
+
+            telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+            requests.post(telegram_url, json={
+                "chat_id": CHANNEL_ID,
+                "text": message,
+                "parse_mode": "HTML"
+            })
+
+            break
+
+        return {"status": "checked"}
+
+    except Exception as e:
+        return {"error": str(e)}
 
         title = item.find("title").text
         link = item.find("link").text
