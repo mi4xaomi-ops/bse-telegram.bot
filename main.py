@@ -32,36 +32,31 @@ def run():
         items = channel.findall("item")
 
         for item in items:
-
             title = item.findtext("title", "")
             link = item.findtext("link", "")
 
             if not title or not link:
-                continue   # ✅ valid (inside loop)
+                continue  # ✅ safe (inside loop)
 
             message = f"📢 <b>{title}</b>\n\n🔗 {link}"
 
             telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
-            requests.post(telegram_url, json={
-                "chat_id": CHANNEL_ID,
-                "text": message,
-                "parse_mode": "HTML"
-            })
+            requests.post(
+                telegram_url,
+                json={
+                    "chat_id": CHANNEL_ID,
+                    "text": message,
+                    "parse_mode": "HTML"
+                }
+            )
 
-            break   # send only first new item
+            break  # send only one item
 
         return {"status": "checked"}
 
     except Exception as e:
         return {"error": str(e)}
-
-        title = item.find("title").text
-        link = item.find("link").text
-        description = item.find("description").text or ""
-
-        if "Scrip Code" not in description:
-            continue
 
         uid = generate_id(title, link)
         if uid in POSTED:
