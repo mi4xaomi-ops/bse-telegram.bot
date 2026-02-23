@@ -66,6 +66,9 @@ response = requests.get(data.pdf_url, headers=headers, timeout=15)
 
         return {"bullets": bullets}
 
-    except Exception as e:
-        print("ERROR:", str(e))
+    try:
+    response = requests.get(url)
+    data = response.json()
+finally:
+    print("Done")
         raise HTTPException(status_code=500, detail=str(e))
