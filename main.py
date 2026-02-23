@@ -43,7 +43,7 @@ def run():
 
             message = f"📢 <b>{title}</b>\n\n🔗 {link}"
 
-            telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+            telegram_url = f"https://api.telegram.org/bot8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA/sendMessage"
 
             requests.post(telegram_url, json={
                 "chat_id": CHANNEL_ID,
