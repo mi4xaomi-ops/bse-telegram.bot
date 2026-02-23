@@ -13,7 +13,7 @@ CHANNEL_ID = os.environ["CHANNEL_ID"]
 POSTED = set()
 
 def generate_id(title, link):
-    return hashlib.md5((title+link).encode()).hexdigest()
+    return hashlib.md5((title + link).encode()).hexdigest()
 
 @app.get("/")
 def home():
@@ -36,7 +36,11 @@ def run():
             link = item.findtext("link", "")
 
             if not title or not link:
-                continue  # ✅ safe (inside loop)
+                continue
+
+            uid = generate_id(title, link)
+            if uid in POSTED:
+                continue
 
             message = f"📢 <b>{title}</b>\n\n🔗 {link}"
 
@@ -51,28 +55,10 @@ def run():
                 }
             )
 
-            break  # send only one item
+            POSTED.add(uid)
+            break
 
         return {"status": "checked"}
 
     except Exception as e:
         return {"error": str(e)}
-
-        uid = generate_id(title, link)
-        if uid in POSTED:
-            continue
-
-        message = f"📢 <b>{title}</b>\n\n🔗 {link}"
-
-        telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-
-        requests.post(telegram_url, json={
-            "chat_id": CHANNEL_ID,
-            "text": message,
-            "parse_mode": "HTML"
-        })
-
-        POSTED.add(uid)
-        break
-
-    return {"status": "checked"}
