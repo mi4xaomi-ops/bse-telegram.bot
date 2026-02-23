@@ -52,7 +52,7 @@ response = requests.get(data.pdf_url, headers=headers, timeout=15)
         full_text = ""
 
         with pdfplumber.open(pdf_bytes) as pdf:
-            for page in pdf.pages[:3]:   # LIMIT pages for safety
+            for page in pdf.pages[:2]:   # LIMIT pages for safety
                 text = page.extract_text()
                 if text:
                     full_text += text
