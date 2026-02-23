@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl
 import requests
 import pdfplumber
 import io
@@ -8,7 +8,7 @@ import re
 app = FastAPI()
 
 class PDFRequest(BaseModel):
-    pdf_url: str
+    pdf_url: HttpUrl   # validates URL properly
 
 @app.get("/")
 def home():
@@ -37,22 +37,21 @@ def extract_key_points(text):
 @app.post("/summarize")
 def summarize(data: PDFRequest):
 
-    finally:
+    try:
         headers = {
-    "User-Agent": "Mozilla/5.0"
-}
+            "User-Agent": "Mozilla/5.0"
+        }
 
-response = requests.get(data.pdf_url, headers=headers, timeout=15)
+        response = requests.get(str(data.pdf_url), headers=headers, timeout=15)
 
         if response.status_code != 200:
             raise HTTPException(status_code=400, detail="PDF download failed")
 
         pdf_bytes = io.BytesIO(response.content)
-
         full_text = ""
 
         with pdfplumber.open(pdf_bytes) as pdf:
-            for page in pdf.pages[:2]:   # LIMIT pages for safety
+            for page in pdf.pages[:2]:  # limit pages
                 text = page.extract_text()
                 if text:
                     full_text += text
@@ -61,14 +60,9 @@ response = requests.get(data.pdf_url, headers=headers, timeout=15)
             return {"bullets": ["Unable to extract readable text from PDF."]}
 
         full_text = clean_text(full_text)
-
         bullets = extract_key_points(full_text)
 
         return {"bullets": bullets}
 
-    try:
-    response = requests.get(url)
-    data = response.json()
-finally:
-    print("Done")
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
