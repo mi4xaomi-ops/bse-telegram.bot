@@ -30,20 +30,18 @@ def run():
             return {"error": "Invalid RSS structure"}
 
         items = channel.findall("item")
-        if not items:
-            return {"status": "No items found"}
 
-        for item in items[:5]:
+        for item in items:
 
             title = item.findtext("title", "")
             link = item.findtext("link", "")
 
             if not title or not link:
-                continue
+                continue   # ✅ valid (inside loop)
 
             message = f"📢 <b>{title}</b>\n\n🔗 {link}"
 
-            telegram_url = f"https://api.telegram.org/bot8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA/sendMessage"
+            telegram_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
             requests.post(telegram_url, json={
                 "chat_id": CHANNEL_ID,
@@ -51,7 +49,7 @@ def run():
                 "parse_mode": "HTML"
             })
 
-            break
+            break   # send only first new item
 
         return {"status": "checked"}
 
