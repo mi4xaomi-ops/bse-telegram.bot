@@ -194,7 +194,7 @@ def send_telegram(message: str):
 @app.get("/run")
 def run_bot():
 
-    feed = feedparser.parse(RSS_FEED_URL)
+    feed = feedparser.parse(https://www.bseindia.com/data/xml/announcements.xml)
 
     for entry in feed.entries:
 
