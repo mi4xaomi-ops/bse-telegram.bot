@@ -13,7 +13,7 @@ from fastapi import FastAPI
 
 BOT_TOKEN = os.getenv("8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA")
 CHAT_ID = os.getenv("-1003545287392")
-RSS_FEED_URL = os.getenv("RSS_FEED_URL")
+RSS_FEED_URL = os.getenv("https://www.bseindia.com/data/xml/announcements.xml")
 
 app = FastAPI()
 
