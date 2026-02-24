@@ -1,13 +1,8 @@
-# ==========================================================
-# BSE ANNOUNCEMENT TELEGRAM BOT
-# ==========================================================
-
 import os
 import hashlib
 import logging
 import requests
 import feedparser
-from typing import Dict
 from fastapi import FastAPI, HTTPException
 
 # ==========================================================
@@ -35,85 +30,6 @@ logger = logging.getLogger("BSE-Telegram-Bot")
 app = FastAPI(title="BSE Announcement Telegram Bot")
 
 # ==========================================================
-# CATEGORY MASTER (CLEAN)
-# ==========================================================
-
-CATEGORY_MASTER = [
-    {
-        "main": "Financial Results",
-        "emoji": "📊",
-        "priority": 1,
-        "subcategories": [
-            {"name": "Quarterly Results", "keywords": ["Quarterly Results", "Q1", "Q2", "Q3", "Q4"]},
-            {"name": "Annual Results", "keywords": ["Annual Results"]},
-            {"name": "Regulation 33 Filing", "keywords": ["Regulation 33"]},
-        ],
-    },
-    {
-        "main": "Corporate Action",
-        "emoji": "💰",
-        "priority": 2,
-        "subcategories": [
-            {"name": "Dividend", "keywords": ["Dividend", "Record Date", "Ex-Date"]},
-            {"name": "Special Dividend", "keywords": ["Special Dividend", "Record Date"]},
-            {"name": "Interim Dividend", "keywords": ["Interim Dividend", "Record Date"]},
-            {"name": "Bonus Issue", "keywords": ["Bonus", "Bonus Issue", "Record Date"]},
-            {"name": "Stock Split", "keywords": ["Stock Split", "Subdivision", "Record Date"]},
-            {"name": "Buyback", "keywords": ["Buyback"]},
-            {"name": "Stock Buyback Completion", "keywords": ["Buyback Completion"]},
-            {"name": "Regulation 30 Disclosure", "keywords": ["Regulation 30", "Material Events", "Material Announcement", "Board Decision", "Merger", "Acquisition", "Change in Control"]},
-        ],
-    },
-    {
-        "main": "Shareholding Pattern",
-        "emoji": "👥",
-        "priority": 3,
-        "subcategories": [
-            {"name": "Promoter Holding", "keywords": ["Promoter Holding", "Promoter Group"]},
-            {"name": "Public Holding", "keywords": ["Public Holding"]},
-            {"name": "Change in Shareholding", "keywords": ["Change in Shareholding"]},
-        ],
-    },
-    {
-        "main": "Equity Segment",
-        "emoji": "📈",
-        "priority": 4,
-        "subcategories": [
-            {"name": "Initial Public Offering (IPO)", "keywords": ["IPO", "Initial Public Offering"]},
-            {"name": "Follow-on Public Offering (FPO)", "keywords": ["FPO", "Follow-on Public Offering"]},
-            {"name": "Bonus Issue (Equity)", "keywords": ["Bonus Issue", "Equity Bonus", "Record Date"]},
-            {"name": "Stock Split", "keywords": ["Stock Split", "Subdivision", "Record Date"]},
-            {"name": "Share Buyback", "keywords": ["Buyback"]},
-            {"name": "Equity Listing", "keywords": ["Equity Listing", "Listed on BSE"]},
-            {"name": "Delisting of Securities", "keywords": ["Delisting", "Delisted", "Delisting Announcement"]},
-        ],
-    },
-    {
-        "main": "Listing Announcements",
-        "emoji": "📃",
-        "priority": 5,
-        "subcategories": [
-            {"name": "New Listing of Securities", "keywords": ["New Listing", "Listed on BSE"]},
-            {"name": "Relisting of Securities", "keywords": ["Relisting", "Relisted"]},
-            {"name": "Listing Approval", "keywords": ["Listing Approval", "Listing Permission"]},
-            {"name": "Listing Compliance", "keywords": ["Listing Compliance", "BSE Listing Requirements"]},
-            {"name": "Suspension of Listing", "keywords": ["Suspension", "Trading Halt", "Trading Suspension"]},
-            {"name": "Removal of Listing", "keywords": ["Removal of Listing", "Delisting", "Trading Halt"]},
-        ],
-    },
-    {
-        "main": "General Corporate Announcements",
-        "emoji": "📌",
-        "priority": 99,
-        "subcategories": [
-            {"name": "Regulation 30 Disclosure", "keywords": ["Regulation 30", "Material Events", "Board Resolutions", "Leadership Change", "Business Discontinuation", "Changes in Control"]},
-            {"name": "Press Release", "keywords": ["Press Release"]},
-            {"name": "Company Update", "keywords": ["Company Update"]},
-        ],
-    },
-]
-
-# ==========================================================
 # DEDUP MEMORY
 # ==========================================================
 
@@ -125,35 +41,54 @@ PROCESSED_HASHES = set()
 
 def classify(title: str) -> Dict[str, str]:
     title_lower = title.lower()
-    matches = []
 
-    for category in CATEGORY_MASTER:
-        for sub in category["subcategories"]:
-            for keyword in sub["keywords"]:
-                if keyword.lower() in title_lower:
-                    matches.append((category, sub))
-                    break
-
-    if not matches:
-        return {"main": "Other", "sub": "", "emoji": "📌"}
-
-    matches.sort(key=lambda x: x[0]["priority"])
-    best_category, best_sub = matches[0]
-
-    return {
-        "main": best_category["main"],
-        "sub": best_sub["name"],
-        "emoji": best_category["emoji"],
-    }
+    # Prioritize and classify based on multiple possible keywords
+    if "dividend" in title_lower or "profit sharing" in title_lower:
+        return {"main": "💰 Dividend", "sub": "", "emoji": "💰"}
+    elif "bonus" in title_lower and "issue" in title_lower:
+        return {"main": "💰 Bonus Issue", "sub": "", "emoji": "💰"}
+    elif "quarterly" in title_lower or "annual" in title_lower:
+        return {"main": "📊 Financial Results", "sub": "", "emoji": "📊"}
+    elif "ipo" in title_lower or "initial public offering" in title_lower:
+        return {"main": "📈 IPO Announcement", "sub": "", "emoji": "📈"}
+    elif "stock split" in title_lower or "subdivision" in title_lower:
+        return {"main": "📈 Stock Split", "sub": "", "emoji": "📈"}
+    elif "fpo" in title_lower or "follow-on public offering" in title_lower:
+        return {"main": "📈 FPO", "sub": "", "emoji": "📈"}
+    elif "buyback" in title_lower:
+        return {"main": "💰 Buyback", "sub": "", "emoji": "💰"}
+    elif "regulation 33" in title_lower:
+        return {"main": "📊 Regulation 33 Filing", "sub": "", "emoji": "📊"}
+    elif "regulation 30" in title_lower:
+        return {"main": "📌 Regulation 30 Disclosure", "sub": "", "emoji": "📌"}
+    elif "merger" in title_lower or "acquisition" in title_lower or "takeover" in title_lower:
+        return {"main": "📌 Corporate Action (Merger/Acquisition)", "sub": "", "emoji": "📌"}
+    elif "shareholding" in title_lower or "stockholding" in title_lower:
+        return {"main": "👥 Shareholding Pattern", "sub": "", "emoji": "👥"}
+    elif "new listing" in title_lower or "listed on bse" in title_lower:
+        return {"main": "📃 New Listing", "sub": "", "emoji": "📃"}
+    elif "delisting" in title_lower:
+        return {"main": "📃 Delisting of Securities", "sub": "", "emoji": "📃"}
+    elif "press release" in title_lower:
+        return {"main": "📌 Press Release", "sub": "", "emoji": "📌"}
+    elif "company update" in title_lower:
+        return {"main": "📌 Company Update", "sub": "", "emoji": "📌"}
+    elif "leadership change" in title_lower or "board changes" in title_lower:
+        return {"main": "📌 Leadership Changes", "sub": "", "emoji": "📌"}
+    elif "csr" in title_lower or "corporate social responsibility" in title_lower:
+        return {"main": "📌 CSR Announcement", "sub": "", "emoji": "📌"}
+    else:
+        # Fallback category for unclear titles
+        return {"main": "📌 General Announcement", "sub": "", "emoji": "📌"}
 
 # ==========================================================
 # TELEGRAM SENDER
 # ==========================================================
 
 def send_to_telegram(message: str):
-    url = f"https://api.telegram.org/bot{8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA}/sendMessage"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": -1003545287392,
+        "chat_id": CHAT_ID,
         "text": message,
         "parse_mode": "HTML",
         "disable_web_page_preview": True,
@@ -166,7 +101,7 @@ def send_to_telegram(message: str):
         raise HTTPException(status_code=500, detail="Telegram API Error")
 
 # ==========================================================
-# FETCH
+# FETCH AND PROCESS RSS FEED
 # ==========================================================
 
 def fetch_and_process(limit: int = 5):
