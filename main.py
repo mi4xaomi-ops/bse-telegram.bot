@@ -1,12 +1,14 @@
+# ==========================================================
+# BSE ANNOUNCEMENT TELEGRAM BOT
+# FULLY AUDITED – EXCHANGE GRADE STRUCTURE
+# ==========================================================
+
 import os
-import re
 import requests
 import feedparser
 import hashlib
-from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict
 from fastapi import FastAPI
-import uvicorn
 
 # ==========================================================
 # CONFIGURATION
@@ -14,377 +16,183 @@ import uvicorn
 
 BOT_TOKEN = os.getenv("8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA")
 CHAT_ID = os.getenv("-1003545287392")
-RSS_FEED_URL = os.getenv("https://www.bseindia.com/data/xml/announcements.xml")
+RSS_FEED_URL = "https://www.bseindia.com/data/xml/announcements.xml"
 
 app = FastAPI()
 
 # ==========================================================
-# CATEGORY MASTER (DEDUPED & PRIORITY SAFE)
+# CATEGORY MASTER (EXCHANGE-ALIGNED)
 # ==========================================================
 
 CATEGORY_MASTER = [
 
-    # ======================================================
-    # 1️⃣ FINANCIAL RESULTS (Highest Priority)
-    # ======================================================
+    # 1️⃣ FINANCIAL RESULTS
     {
         "main": "Financial Results",
+        "emoji": "📊",
         "priority": 1,
-        "keywords": [
-            "Quarterly Results",
-            "Annual Results",
-            "Financial Results",
-            "Audited Results",
-            "Unaudited Results",
-            "Standalone Results",
-            "Consolidated Results",
-            "Q1", "Q2", "Q3", "Q4",
-            "Regulation 33"
-        ],
-        "emoji": "📊"
+        "subcategories": [
+            {"name": "Quarterly Results", "keywords": ["Quarterly Results", "Q1", "Q2", "Q3", "Q4"]},
+            {"name": "Annual Results", "keywords": ["Annual Results"]},
+            {"name": "Audited Results", "keywords": ["Audited Results"]},
+            {"name": "Unaudited Results", "keywords": ["Unaudited Results"]},
+            {"name": "Limited Review Report", "keywords": ["Limited Review"]},
+            {"name": "Standalone Results", "keywords": ["Standalone"]},
+            {"name": "Consolidated Results", "keywords": ["Consolidated"]},
+            {"name": "Regulation 33 Filing", "keywords": ["Regulation 33"]}
+        ]
     },
 
-    # ======================================================
-    # 2️⃣ DIVIDEND
-    # ======================================================
+    # 2️⃣ CORPORATE ACTION
     {
-        "main": "Dividend",
+        "main": "Corporate Action",
+        "emoji": "💰",
         "priority": 2,
-        "keywords": [
-            "Dividend",
-            "Interim Dividend",
-            "Final Dividend",
-            "Special Dividend"
-        ],
-        "emoji": "💰"
+        "subcategories": [
+            {"name": "Dividend Recommendation", "keywords": ["Recommended Dividend"]},
+            {"name": "Dividend Declaration", "keywords": ["Declared Dividend"]},
+            {"name": "Interim Dividend", "keywords": ["Interim Dividend"]},
+            {"name": "Final Dividend", "keywords": ["Final Dividend"]},
+            {"name": "Bonus Issue", "keywords": ["Bonus"]},
+            {"name": "Stock Split", "keywords": ["Stock Split", "Subdivision"]},
+            {"name": "Buyback", "keywords": ["Buyback"]},
+            {"name": "Record Date", "keywords": ["Record Date"]},
+            {"name": "Book Closure", "keywords": ["Book Closure"]},
+            {"name": "Corporate Action Amendment", "keywords": ["Revised Record Date", "Amendment"]}
+        ]
     },
 
-    # ======================================================
-    # 3️⃣ BONUS / SPLIT
-    # ======================================================
+    # 3️⃣ FUND RAISING
     {
-        "main": "Bonus / Split",
-        "priority": 2,
-        "keywords": [
-            "Bonus",
-            "Stock Split",
-            "Subdivision",
-            "Face Value Split"
-        ],
-        "emoji": "🎁"
-    },
-
-    # ======================================================
-    # 4️⃣ BUYBACK
-    # ======================================================
-    {
-        "main": "Buyback",
-        "priority": 2,
-        "keywords": [
-            "Buyback",
-            "Buy Back"
-        ],
-        "emoji": "🔄"
-    },
-
-    # ======================================================
-    # 5️⃣ FUND RAISING / CAPITAL ISSUE
-    # ======================================================
-    {
-        "main": "Fund Raising / Capital Issue",
-        "priority": 2,
-        "keywords": [
-            "Rights Issue",
-            "QIP",
-            "Qualified Institutions Placement",
-            "Preferential Issue",
-            "Warrants",
-            "Debentures",
-            "NCD",
-            "Bond Issue",
-            "Allotment",
-            "ESOP",
-            "Employee Stock Option"
-        ],
-        "emoji": "🏦"
-    },
-
-    # ======================================================
-    # 6️⃣ MERGER / ACQUISITION
-    # ======================================================
-    {
-        "main": "Merger / Acquisition",
+        "main": "Fund Raising",
+        "emoji": "🏦",
         "priority": 3,
-        "keywords": [
-            "Merger",
-            "Acquisition",
-            "Amalgamation",
-            "Scheme of Arrangement",
-            "Takeover"
-        ],
-        "emoji": "🤝"
+        "subcategories": [
+            {"name": "Rights Issue", "keywords": ["Rights Issue"]},
+            {"name": "QIP", "keywords": ["QIP"]},
+            {"name": "Preferential Issue", "keywords": ["Preferential Issue"]},
+            {"name": "Preferential Allotment", "keywords": ["Preferential Allotment"]},
+            {"name": "Warrants Issue", "keywords": ["Warrants"]},
+            {"name": "Warrant Conversion", "keywords": ["Conversion of Warrants"]},
+            {"name": "NCD / Debentures", "keywords": ["NCD", "Debentures"]},
+            {"name": "FCCB", "keywords": ["FCCB"]},
+            {"name": "Commercial Paper", "keywords": ["Commercial Paper"]},
+            {"name": "Allotment Update", "keywords": ["Allotment"]},
+            {"name": "ESOP", "keywords": ["ESOP"]}
+        ]
     },
 
-    # ======================================================
-    # 7️⃣ ORDER WIN / CONTRACT
-    # ======================================================
+    # 4️⃣ MERGER / RESTRUCTURING
     {
-        "main": "Order Win / Contract",
+        "main": "Merger / Restructuring",
+        "emoji": "🤝",
         "priority": 3,
-        "keywords": [
-            "Order Win",
-            "Order Received",
-            "Contract Awarded",
-            "Letter of Award",
-            "LOA",
-            "LOI",
-            "MoU"
-        ],
-        "emoji": "📦"
+        "subcategories": [
+            {"name": "Merger", "keywords": ["Merger"]},
+            {"name": "Acquisition", "keywords": ["Acquisition"]},
+            {"name": "Scheme of Arrangement", "keywords": ["Scheme of Arrangement"]},
+            {"name": "NCLT Order", "keywords": ["NCLT"]},
+            {"name": "Insolvency / IBC", "keywords": ["Insolvency", "CIRP", "IBC"]}
+        ]
     },
 
-    # ======================================================
-    # 8️⃣ BOARD MEETING
-    # ======================================================
+    # 5️⃣ BOARD & SHAREHOLDER MATTERS
     {
-        "main": "Board Meeting",
+        "main": "Board / Shareholder Matters",
+        "emoji": "📋",
         "priority": 4,
-        "keywords": [
-            "Board Meeting",
-            "Outcome of Board Meeting",
-            "Board Meeting Intimation"
-        ],
-        "emoji": "📋"
+        "subcategories": [
+            {"name": "Board Meeting Intimation", "keywords": ["Regulation 29", "Board Meeting Intimation"]},
+            {"name": "Outcome of Board Meeting", "keywords": ["Outcome of Board Meeting"]},
+            {"name": "AGM", "keywords": ["AGM"]},
+            {"name": "EGM", "keywords": ["EGM"]},
+            {"name": "Postal Ballot", "keywords": ["Postal Ballot"]},
+            {"name": "Voting Results", "keywords": ["Voting Results", "Regulation 44"]}
+        ]
     },
 
-    # ======================================================
-    # 9️⃣ AGM / EGM / VOTING
-    # ======================================================
+    # 6️⃣ MANAGEMENT & GOVERNANCE
     {
-        "main": "AGM / EGM / Voting",
-        "priority": 4,
-        "keywords": [
-            "AGM",
-            "EGM",
-            "Postal Ballot",
-            "Voting Results",
-            "Regulation 44"
-        ],
-        "emoji": "🗳"
-    },
-
-    # ======================================================
-    # 🔟 MANAGEMENT CHANGES
-    # ======================================================
-    {
-        "main": "Management Change",
-        "priority": 4,
-        "keywords": [
-            "Appointment",
-            "Resignation",
-            "CFO",
-            "CEO",
-            "Managing Director",
-            "Independent Director",
-            "Company Secretary"
-        ],
-        "emoji": "👤"
-    },
-
-    # ======================================================
-    # 1️⃣1️⃣ GOVERNANCE / COMPLIANCE
-    # ======================================================
-    {
-        "main": "Corporate Governance / Compliance",
+        "main": "Management / Governance",
+        "emoji": "👤",
         "priority": 5,
-        "keywords": [
-            "Corporate Governance Report",
-            "Regulation 27",
-            "Shareholding Pattern",
-            "Related Party Transaction",
-            "Regulation 30",
-            "Disclosure under Regulation"
-        ],
-        "emoji": "🏛"
+        "subcategories": [
+            {"name": "Appointment", "keywords": ["Appointment"]},
+            {"name": "Resignation", "keywords": ["Resignation"]},
+            {"name": "Change in Designation", "keywords": ["Change in Designation"]},
+            {"name": "Corporate Governance Report", "keywords": ["Regulation 27"]},
+            {"name": "Shareholding Pattern", "keywords": ["Regulation 31"]},
+            {"name": "Reconciliation Audit", "keywords": ["Reconciliation of Share Capital"]},
+            {"name": "Trading Window Closure", "keywords": ["Trading Window Closure"]},
+            {"name": "Related Party Transactions", "keywords": ["Related Party Transaction"]}
+        ]
     },
 
-    # ======================================================
-    # 1️⃣2️⃣ BUSINESS UPDATE
-    # ======================================================
+    # 7️⃣ COMPANY UPDATE (REGULATION 30 DRIVEN)
     {
-        "main": "Business Update",
+        "main": "Company Update",
+        "emoji": "🚀",
         "priority": 6,
-        "keywords": [
-            "Operational Update",
-            "Business Update",
-            "Sales Update",
-            "Capacity Expansion",
-            "New Project",
-            "Expansion"
-        ],
-        "emoji": "🚀"
+        "subcategories": [
+            {"name": "Business Update", "keywords": ["Business Update"]},
+            {"name": "Operational Update", "keywords": ["Operational Update"]},
+            {"name": "Order Win", "keywords": ["Order Received", "Contract Awarded", "LOA", "LOI"]},
+            {"name": "Press Release", "keywords": ["Press Release"]},
+            {"name": "Investor Presentation", "keywords": ["Investor Presentation"]},
+            {"name": "Earnings Call", "keywords": ["Earnings Call"]},
+            {"name": "Transcript", "keywords": ["Transcript"]},
+            {"name": "Credit Rating", "keywords": ["Credit Rating"]},
+            {"name": "Clarification", "keywords": ["Clarification"]},
+            {"name": "Reply to Exchange Query", "keywords": ["Reply to Exchange"]},
+            {"name": "ESG / Sustainability Report", "keywords": ["Sustainability Report", "BRSR"]}
+        ]
     },
 
-    # ======================================================
-    # 1️⃣3️⃣ EXCHANGE / REGULATORY ACTION
-    # ======================================================
+    # 8️⃣ REGULATORY / LEGAL
     {
-        "main": "Exchange / Regulatory Action",
+        "main": "Regulatory / Legal",
+        "emoji": "⚖️",
         "priority": 7,
-        "keywords": [
-            "Suspension",
-            "Delisting",
-            "GSM",
-            "ASM",
-            "Price Band",
-            "Clarification",
-            "Reply to Exchange Query"
-        ],
-        "emoji": "🚨"
+        "subcategories": [
+            {"name": "Litigation", "keywords": ["Litigation", "Court Order"]},
+            {"name": "Disclosure of Default", "keywords": ["Default"]},
+            {"name": "Exchange Action", "keywords": ["Suspension", "Delisting", "GSM", "ASM"]}
+        ]
     },
 
-    # ======================================================
-    # 1️⃣4️⃣ INVESTOR / PRESS COMMUNICATION
-    # ======================================================
-    {
-        "main": "Investor / Press Communication",
-        "priority": 8,
-        "keywords": [
-            "Press Release",
-            "Media Release",
-            "Investor Presentation",
-            "Earnings Call",
-            "Analyst Meet",
-            "Transcript"
-        ],
-        "emoji": "📰"
-    },
-
-    # ======================================================
     # DEFAULT
-    # ======================================================
     {
         "main": "Other",
+        "emoji": "📌",
         "priority": 99,
-        "keywords": [],
-        "emoji": "📌"
+        "subcategories": []
     }
 ]
-
-# ==========================================================
-# DUPLICATE SUPPRESSION
-# ==========================================================
-
-PROCESSED_HASHES = set()
-
-def is_duplicate(title: str) -> bool:
-    title_hash = hashlib.md5(title.encode()).hexdigest()
-    if title_hash in PROCESSED_HASHES:
-        return True
-    PROCESSED_HASHES.add(title_hash)
-    return False
 
 # ==========================================================
 # CLASSIFICATION ENGINE
 # ==========================================================
 
-def classify(title: str) -> Dict[str, Any]:
+def classify(title: str) -> Dict[str, str]:
+
     title_lower = title.lower()
     matched = []
 
     for category in CATEGORY_MASTER:
-        for keyword in category["keywords"]:
-            if keyword.lower() in title_lower:
-                matched.append(category)
-                break
+        for sub in category["subcategories"]:
+            for keyword in sub["keywords"]:
+                if keyword.lower() in title_lower:
+                    matched.append((category, sub))
+                    break
 
     if not matched:
-        return CATEGORY_MASTER[-1]
+        return {"main": "Other", "sub": "", "emoji": "📌"}
 
-    matched_sorted = sorted(matched, key=lambda x: x["priority"])
-    return matched_sorted[0]
+    matched_sorted = sorted(matched, key=lambda x: x[0]["priority"])
+    best_category, best_sub = matched_sorted[0]
 
-# ==========================================================
-# RECORD DATE DETECTION (SEPARATE – NO DUPLICATION)
-# ==========================================================
-
-def detect_record_date(text: str) -> str:
-    match = re.search(r"Record Date[:\s]*([\d\-\/]+)", text, re.I)
-    if match:
-        return match.group(1)
-    return ""
-
-# ==========================================================
-# FINANCIAL EXTRACTION
-# ==========================================================
-
-def extract_financials(text: str) -> List[str]:
-    results = []
-
-    revenue = re.search(r"(Revenue|Total Income)[^\d]{0,25}([\d,]+\.*\d*)", text, re.I)
-    profit = re.search(r"(Net Profit|PAT)[^\d\-]{0,25}([\d,\-]+\.*\d*)", text, re.I)
-    eps = re.search(r"(EPS)[^\d\-]{0,25}([\d\.\-]+)", text, re.I)
-
-    if revenue:
-        results.append(f"Revenue: ₹{revenue.group(2)}")
-
-    if profit:
-        results.append(f"Net Profit: ₹{profit.group(2)}")
-
-    if eps:
-        results.append(f"EPS: ₹{eps.group(2)}")
-
-    return results
-
-# ==========================================================
-# TELEGRAM SENDER
-# ==========================================================
-
-def send_telegram(message: str):
-    url = f"https://api.telegram.org/bot{8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA}/sendMessage"
-    payload = {
-        "chat_id": -1003545287392,
-        "text": message,
-        "parse_mode": "HTML"
+    return {
+        "main": best_category["main"],
+        "sub": best_sub["name"],
+        "emoji": best_category["emoji"]
     }
-    requests.post(url, data=payload)
-
-# ==========================================================
-# MAIN RSS PROCESSOR
-# ==========================================================
-
-@app.get("/run")
-def run_bot():
-
-    feed = feedparser.parse("https://www.bseindia.com/data/xml/announcements.xml")
-
-    for entry in feed.entries:
-
-        title = entry.title.strip()
-
-        if is_duplicate(title):
-            continue
-
-        summary = entry.summary if "summary" in entry else ""
-        link = entry.link
-
-        category = classify(title)
-        record_date = detect_record_date(summary)
-        financials = extract_financials(summary)
-
-        message = (
-            f"{category['emoji']} <b>{category['main']}</b>\n\n"
-            f"🏢 {title}\n"
-        )
-
-        if record_date:
-            message += f"📅 Record Date: {record_date}\n"
-
-        if financials:
-            message += "\n".join(financials) + "\n"
-
-        message += f"\n🔗 {link}"
-
-        send_telegram(message)
-
-    return {"status": "Bot executed successfully"}
