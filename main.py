@@ -1,6 +1,5 @@
 # ==========================================================
 # BSE ANNOUNCEMENT TELEGRAM BOT
-# EXCHANGE-GRADE | PRODUCTION READY
 # ==========================================================
 
 import os
@@ -12,7 +11,7 @@ from typing import Dict
 from fastapi import FastAPI, HTTPException
 
 # ==========================================================
-# CONFIGURATION (SECURE ENV VARIABLES)
+# CONFIGURATION
 # ==========================================================
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -23,20 +22,20 @@ if not BOT_TOKEN or not CHAT_ID:
     raise ValueError("BOT_TOKEN and CHAT_ID must be set as environment variables")
 
 # ==========================================================
-# LOGGING SETUP
+# LOGGING
 # ==========================================================
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("BSE-Telegram-Bot")
 
 # ==========================================================
-# FASTAPI APP
+# FASTAPI
 # ==========================================================
 
 app = FastAPI(title="BSE Announcement Telegram Bot")
 
 # ==========================================================
-# CATEGORY MASTER (EXCHANGE-ALIGNED)
+# CATEGORY MASTER (CLEAN)
 # ==========================================================
 
 CATEGORY_MASTER = [
@@ -47,8 +46,6 @@ CATEGORY_MASTER = [
         "subcategories": [
             {"name": "Quarterly Results", "keywords": ["Quarterly Results", "Q1", "Q2", "Q3", "Q4"]},
             {"name": "Annual Results", "keywords": ["Annual Results"]},
-            {"name": "Audited Results", "keywords": ["Audited Results"]},
-            {"name": "Unaudited Results", "keywords": ["Unaudited Results"]},
             {"name": "Regulation 33 Filing", "keywords": ["Regulation 33"]},
         ],
     },
@@ -61,28 +58,15 @@ CATEGORY_MASTER = [
             {"name": "Bonus Issue", "keywords": ["Bonus"]},
             {"name": "Stock Split", "keywords": ["Stock Split", "Subdivision"]},
             {"name": "Buyback", "keywords": ["Buyback"]},
-            {"name": "Record Date", "keywords": ["Record Date"]},
-        ],
-    },
-    {
-        "main": "Fund Raising",
-        "emoji": "🏦",
-        "priority": 3,
-        "subcategories": [
-            {"name": "Rights Issue", "keywords": ["Rights Issue"]},
-            {"name": "QIP", "keywords": ["QIP"]},
-            {"name": "Preferential Issue", "keywords": ["Preferential"]},
-            {"name": "Allotment", "keywords": ["Allotment"]},
         ],
     },
     {
         "main": "Company Update",
         "emoji": "🚀",
-        "priority": 4,
+        "priority": 3,
         "subcategories": [
             {"name": "Order Win", "keywords": ["Order Received", "LOA", "LOI"]},
             {"name": "Press Release", "keywords": ["Press Release"]},
-            {"name": "Investor Presentation", "keywords": ["Investor Presentation"]},
         ],
     },
     {
@@ -94,14 +78,13 @@ CATEGORY_MASTER = [
 ]
 
 # ==========================================================
-# DEDUP STORAGE (IN-MEMORY)
-# NOTE: Use Redis/DB for full production persistence
+# DEDUP MEMORY
 # ==========================================================
 
 PROCESSED_HASHES = set()
 
 # ==========================================================
-# CLASSIFICATION ENGINE
+# CLASSIFIER
 # ==========================================================
 
 def classify(title: str) -> Dict[str, str]:
@@ -143,28 +126,17 @@ def send_to_telegram(message: str):
     response = requests.post(url, json=payload, timeout=10)
 
     if response.status_code != 200:
-        logger.error(f"Telegram Error: {response.text}")
+        logger.error(response.text)
         raise HTTPException(status_code=500, detail="Telegram API Error")
 
-    return response.json()
-
 # ==========================================================
-# HASH GENERATOR
-# ==========================================================
-
-def generate_hash(text: str) -> str:
-    return hashlib.sha256(text.encode()).hexdigest()
-
-# ==========================================================
-# FETCH + PROCESS ANNOUNCEMENTS
+# FETCH
 # ==========================================================
 
 def fetch_and_process(limit: int = 5):
-    logger.info("Fetching BSE RSS feed...")
     feed = feedparser.parse(RSS_FEED_URL)
 
     if not feed.entries:
-        logger.warning("No announcements found.")
         return {"status": "No announcements"}
 
     posted = 0
@@ -173,7 +145,7 @@ def fetch_and_process(limit: int = 5):
         title = entry.title
         link = entry.link
 
-        announcement_hash = generate_hash(title)
+        announcement_hash = hashlib.sha256(title.encode()).hexdigest()
 
         if announcement_hash in PROCESSED_HASHES:
             continue
@@ -192,7 +164,6 @@ def fetch_and_process(limit: int = 5):
         PROCESSED_HASHES.add(announcement_hash)
         posted += 1
 
-    logger.info(f"Posted {posted} new announcements.")
     return {"posted": posted}
 
 # ==========================================================
@@ -200,8 +171,8 @@ def fetch_and_process(limit: int = 5):
 # ==========================================================
 
 @app.get("/")
-def health_check():
-    return {"status": "BSE Telegram Bot Live"}
+def health():
+    return {"status": "Bot Live"}
 
 @app.get("/run")
 def run():
