@@ -70,6 +70,20 @@ CATEGORY_MASTER = [
         ],
     },
     {
+        "main": "Equity Segment",
+        "emoji": "📈",
+        "priority": 4,
+        "subcategories": [
+            {"name": "Initial Public Offering (IPO)", "keywords": ["IPO", "Initial Public Offering"]},
+            {"name": "Rights Issue", "keywords": ["Rights Issue"]},
+            {"name": "Follow-on Public Offering (FPO)", "keywords": ["FPO", "Follow-on Public Offering"]},
+            {"name": "Bonus Issue (Equity)", "keywords": ["Bonus Issue", "Equity Bonus"]},
+            {"name": "Stock Split", "keywords": ["Stock Split", "Subdivision"]},
+            {"name": "Share Buyback", "keywords": ["Buyback"]},
+            {"name": "Equity Listing", "keywords": ["Equity Listing", "Listed on BSE"]},
+        ],
+    },
+    {
         "main": "Other",
         "emoji": "📌",
         "priority": 99,
