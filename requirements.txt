@@ -2,7 +2,3 @@ fastapi
 uvicorn
 requests
 feedparser
-os
-hashlib
-logging
-
