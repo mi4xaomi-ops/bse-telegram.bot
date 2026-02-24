@@ -1,1 +1,1 @@
-# bse-telegram.bot
+# bsetelegram.bot
