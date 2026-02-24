@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: bse-telegram-bot
+    name: bse-telegram.bot
     env: python
     plan: free
     buildCommand: "pip install -r requirements.txt"
