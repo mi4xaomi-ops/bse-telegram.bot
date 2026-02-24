@@ -14,8 +14,8 @@ from fastapi import FastAPI, HTTPException
 # CONFIGURATION
 # ==========================================================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
+BOT_TOKEN = os.getenv("8536725493:AAFSdPtNKJEMFsapJGfH5sh9XtIc-lbruCA")
+CHAT_ID = os.getenv("-1003545287392")
 RSS_FEED_URL = "https://www.bseindia.com/data/xml/announcements.xml"
 
 if not BOT_TOKEN or not CHAT_ID:
